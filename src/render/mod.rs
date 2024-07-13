@@ -1200,11 +1200,7 @@ impl SpecializedRenderPipeline for ParticlesRenderPipeline {
                 // Bevy uses reverse-Z, so Greater really means closer
                 depth_compare: CompareFunction::Greater,
                 stencil: StencilState::default(),
-                // bias: DepthBiasState::default(),
-                bias: DepthBiasState {
-                    constant: 100,
-                    ..default()
-                },
+                bias: DepthBiasState::default(),
             }),
         };
 
@@ -1219,11 +1215,7 @@ impl SpecializedRenderPipeline for ParticlesRenderPipeline {
             // Bevy uses reverse-Z, so Greater really means closer
             depth_compare: CompareFunction::Greater,
             stencil: StencilState::default(),
-            // bias: DepthBiasState::default(),
-            bias: DepthBiasState {
-                constant: 0.1,
-                ..default()
-            },
+            bias: DepthBiasState::default(),
         });
 
         let format = if key.hdr {
