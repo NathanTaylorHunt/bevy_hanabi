@@ -1202,7 +1202,7 @@ impl SpecializedRenderPipeline for ParticlesRenderPipeline {
                 stencil: StencilState::default(),
                 // bias: DepthBiasState::default(),
                 bias: DepthBiasState {
-                    constant: 0.1,
+                    constant: 100,
                     ..default()
                 },
             }),
