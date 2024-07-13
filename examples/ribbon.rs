@@ -121,7 +121,7 @@ fn setup(mut commands: Commands, mut effects: ResMut<Assets<EffectAsset>>) {
     .init(init_age_attr)
     .init(init_lifetime_attr)
     .init(init_size_attr)
-    .update_groups(move_modifier, ParticleGroupSet::single(0))
+    // .update_groups(move_modifier, ParticleGroupSet::single(0))
     .update_groups(clone_modifier, ParticleGroupSet::single(0))
     .update_groups(update_lifetime_attr, ParticleGroupSet::single(1))
     .render(RibbonModifier)
@@ -138,9 +138,20 @@ fn setup(mut commands: Commands, mut effects: ResMut<Assets<EffectAsset>>) {
         .insert(Name::new("ribbon"));
 }
 
-fn move_particle_effect(mut query: Query<&mut Transform, With<ParticleEffect>>, timer: Res<Time>) {
+fn move_particle_effect(
+    mut query: Query<&mut Transform, With<ParticleEffect>>,
+    mut spawner: Query<&mut EffectSpawner>,
+    timer: Res<Time>,
+) {
     let theta = timer.elapsed_seconds() * 1.0;
     for mut transform in query.iter_mut() {
-        transform.translation = vec3(f32::cos(theta), f32::sin(theta), 0.0) * 5.0;
+        transform.translation = vec3(f32::cos(theta), 0.0, 0.0) * 5.0;
+        // transform.rotate_y(timer.delta_seconds());
+    }
+
+    for mut spawner in &mut spawner {
+        // spawner.set_active(theta.round() as i32 % 3 == 0);
+        // info!("spawner {}", theta.round() as i32 % 3 == 0);
+        // spawner.reset();
     }
 }

@@ -443,8 +443,13 @@ axis_y = cross(axis_z, axis_x);
                 }
             }
             OrientMode::AlongVelocity => {
-                context.vertex_code += r#"let dir = normalize(position - get_camera_position_effect_space());
-axis_x = normalize(particle.velocity);
+//                 context.vertex_code += r#"let dir = normalize(position - get_camera_position_effect_space());
+// axis_x = normalize(particle.velocity);
+// axis_y = cross(dir, axis_x);
+// axis_z = cross(axis_x, axis_y);
+// "#;
+                context.vertex_code += r#"let dir = vec3f(0.0, 1.0, 0.0);
+axis_x = vec3f(0.0, 0.0, 1.0);
 axis_y = cross(dir, axis_x);
 axis_z = cross(axis_x, axis_y);
 "#;

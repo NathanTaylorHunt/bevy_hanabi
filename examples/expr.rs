@@ -46,7 +46,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn setup(mut commands: Commands, mut effects: ResMut<Assets<EffectAsset>>) {
+fn setup(
+    mut commands: Commands,
+    mut effects: ResMut<Assets<EffectAsset>>,
+    mut time: ResMut<Time<Virtual>>,
+    asset_server: Res<AssetServer>,
+) {
+    time.set_relative_speed(0.25);
+
+
     commands.spawn((
         Camera3dBundle {
             transform: Transform::from_translation(Vec3::new(3., 12., 20.))
@@ -68,8 +76,10 @@ fn setup(mut commands: Commands, mut effects: ResMut<Assets<EffectAsset>>) {
     color_gradient.add_key(1.0, Vec4::new(0.0, 0.0, 0.0, 0.0));
 
     let mut size_gradient = Gradient::new();
-    size_gradient.add_key(0.3, Vec2::new(0.2, 0.02));
+    size_gradient.add_key(0.3, Vec2::new(1.0, 1.0));
     size_gradient.add_key(1.0, Vec2::ZERO);
+
+    let texture_handle: Handle<Image> = asset_server.load("cloud.png");
 
     let writer = ExprWriter::new();
 
@@ -112,6 +122,10 @@ fn setup(mut commands: Commands, mut effects: ResMut<Assets<EffectAsset>>) {
             .init(init_lifetime)
             .init(init_vel)
             .update(update_accel)
+            .render(ParticleTextureModifier {
+                texture: texture_handle,
+                sample_mapping: ImageSampleMapping::ModulateOpacityFromR,
+            })
             .render(ColorOverLifetimeModifier {
                 gradient: color_gradient,
             })

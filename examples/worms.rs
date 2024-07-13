@@ -142,7 +142,7 @@ fn setup(
     let effect = effects.add(
         EffectAsset::new(
             vec![5000, 5000 * 5],
-            Spawner::rate(CpuValue::Single(5.0)),
+            Spawner::rate(CpuValue::Single(10.0)),
             module,
         )
         .with_name("worms")

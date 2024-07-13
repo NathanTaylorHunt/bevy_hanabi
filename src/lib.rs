@@ -7,7 +7,7 @@
     unsafe_code,
     unstable_features,
     unused_import_braces,
-    unused_qualifications,
+    // unused_qualifications,
     clippy::suboptimal_flops,
     clippy::imprecise_flops,
     clippy::branches_sharing_code,
