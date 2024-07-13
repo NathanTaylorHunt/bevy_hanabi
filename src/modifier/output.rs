@@ -424,7 +424,7 @@ axis_z = cam_rot[2].xyz;
                 if let Some(rotation) = self.rotation {
                     let rotation = context.eval(module, rotation).unwrap();
                     context.vertex_code += &format!(
-                        r#"axis_z = normalize(get_camera_position_effect_space() - position);
+                        r#"axis_z = vec3f(0.0, 0.0, 1.0);
 let particle_rot_in_cam_space = {};
 let particle_rot_in_cam_space_cos = cos(particle_rot_in_cam_space);
 let particle_rot_in_cam_space_sin = sin(particle_rot_in_cam_space);
@@ -448,11 +448,23 @@ axis_y = cross(axis_z, axis_x);
 // axis_y = cross(dir, axis_x);
 // axis_z = cross(axis_x, axis_y);
 // "#;
-                context.vertex_code += r#"let dir = vec3f(0.0, 1.0, 0.0);
-axis_x = vec3f(0.0, 0.0, 1.0);
-axis_y = cross(dir, axis_x);
-axis_z = cross(axis_x, axis_y);
-"#;
+                if let Some(rotation) = self.rotation {
+                    let rotation = context.eval(module, rotation).unwrap();
+                    context.vertex_code += &format!(r#"let dir = vec3f(0.0, 1.0, 0.0);
+    let particle_rot_in_cam_space = {};
+    let particle_rot_in_cam_space_cos = cos(particle_rot_in_cam_space); 
+    let particle_rot_in_cam_space_sin = sin(particle_rot_in_cam_space);
+    axis_x = vec3f(particle_rot_in_cam_space_cos, 0.0, particle_rot_in_cam_space_sin);
+    axis_y = cross(dir, axis_x);
+    axis_z = cross(axis_x, axis_y);
+    "#, rotation);
+                } else {
+                    context.vertex_code += r#"let dir = vec3f(0.0, 1.0, 0.0);
+    axis_x = vec3f(0.0, 0.0, 1.0);
+    axis_y = cross(dir, axis_x);
+    axis_z = cross(axis_x, axis_y);
+    "#;
+                }
             }
         }
     }

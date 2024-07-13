@@ -114,6 +114,11 @@ fn setup(
         speed: writer.lit(3.).expr(),
     };
 
+    let rotation = (writer.rand(ScalarType::Float) * writer.lit(std::f32::consts::TAU)).expr();
+    let init_rotation = SetAttributeModifier::new(Attribute::F32_0, rotation);
+
+    let rotation_attr = writer.attr(Attribute::F32_0).expr();
+
     let effect = effects.add(
         EffectAsset::new(vec![32768], Spawner::rate(500.0.into()), writer.finish())
             .with_name("whirlwind")
@@ -121,6 +126,7 @@ fn setup(
             .init(init_age)
             .init(init_lifetime)
             .init(init_vel)
+            .init(init_rotation)
             .update(update_accel)
             .render(ParticleTextureModifier {
                 texture: texture_handle,
@@ -133,7 +139,12 @@ fn setup(
                 gradient: size_gradient,
                 screen_space_size: false,
             })
-            .render(OrientModifier::new(OrientMode::AlongVelocity)),
+            // .render(OrientModifier::new(OrientMode::AlongVelocity)),
+            // .render(OrientModifier::new(OrientMode::FaceCameraPosition).with_rotation(rotation)),
+            .render(OrientModifier {
+                mode: OrientMode::AlongVelocity,
+                rotation: Some(rotation_attr),
+            })
     );
 
     commands.spawn((
