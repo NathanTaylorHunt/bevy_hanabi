@@ -198,7 +198,7 @@ pub use plugin::{EffectSystems, HanabiPlugin};
 pub use properties::*;
 pub use render::{LayoutFlags, ShaderCache};
 pub use spawn::{tick_spawners, CpuValue, EffectSpawner, Random, Spawner};
-pub use time::{EffectSimulation, EffectSimulationTime};
+pub use time::{EffectSimulation, EffectSimulationTime, SimulationTimeMode};
 
 #[allow(missing_docs)]
 pub mod prelude {

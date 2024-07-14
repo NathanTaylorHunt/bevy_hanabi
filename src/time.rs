@@ -46,9 +46,13 @@ impl Default for EffectSimulation {
     }
 }
 
+/// Uhhhh
 #[derive(Debug, Copy, Clone, Reflect)]
 pub enum SimulationTimeMode {
+    /// Real time
     Real,
+
+    /// Virtual time
     Virtual,
 }
 
