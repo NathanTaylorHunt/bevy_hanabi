@@ -32,6 +32,7 @@ pub struct EffectSimulation {
     paused: bool,
     relative_speed: f64,
     effective_speed: f64,
+    mode: SimulationTimeMode,
 }
 
 impl Default for EffectSimulation {
@@ -40,8 +41,15 @@ impl Default for EffectSimulation {
             paused: false,
             relative_speed: 1.0,
             effective_speed: 1.0,
+            mode: SimulationTimeMode::Virtual,
         }
     }
+}
+
+#[derive(Debug, Copy, Clone, Reflect)]
+pub enum SimulationTimeMode {
+    Real,
+    Virtual,
 }
 
 /// All methods for the [`Time<EffectSimulation>`](EffectSimulation) clock.
@@ -105,6 +113,12 @@ pub trait EffectSimulationTime {
 
     /// Returns `true` if the clock was paused at the start of this update.
     fn was_paused(&self) -> bool;
+
+    /// Returns time mode.
+    fn mode(&self) -> SimulationTimeMode;
+
+    /// Sets the time mode.
+    fn set_mode(&mut self, mode: SimulationTimeMode);
 }
 
 impl EffectSimulationTime for Time<EffectSimulation> {
@@ -159,23 +173,37 @@ impl EffectSimulationTime for Time<EffectSimulation> {
     fn was_paused(&self) -> bool {
         self.context().effective_speed == 0.0
     }
+
+    #[inline]
+    fn mode(&self) -> SimulationTimeMode {
+        self.context().mode
+    }
+
+    #[inline]
+    fn set_mode(&mut self, mode: SimulationTimeMode) {
+        self.context_mut().mode = mode;
+    }
 }
 
 pub(crate) fn effect_simulation_time_system(
     virt: Res<Time<Virtual>>,
+    real: Res<Time<Real>>,
     mut effect_simulation: ResMut<Time<EffectSimulation>>,
 ) {
-    let virt_delta = virt.delta();
+    let delta = match effect_simulation.context().mode {
+        SimulationTimeMode::Real => real.delta(),
+        SimulationTimeMode::Virtual => virt.delta(),
+    };
     let effective_speed = if effect_simulation.context().paused {
         0.0
     } else {
         effect_simulation.context().relative_speed
     };
     let delta = if effective_speed != 1.0 {
-        virt_delta.mul_f64(effective_speed)
+        delta.mul_f64(effective_speed)
     } else {
         // avoid rounding when at normal speed
-        virt_delta
+        delta
     };
     effect_simulation.context_mut().effective_speed = effective_speed * virt.effective_speed_f64();
     effect_simulation.advance_by(delta);
