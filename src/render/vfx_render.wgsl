@@ -174,8 +174,11 @@ fn vertex(
     let next_particle = particle_buffer.particles[next_index];
     var delta = next_particle.position - particle.position;
 
+    let normal = particle.f32x3_0;
+
     axis_x = normalize(delta);
-    axis_y = normalize(cross(axis_x, axis_z));
+    //axis_y = normalize(cross(axis_x, axis_z));
+    axis_y = cross(normal, axis_x);
     axis_z = cross(axis_x, axis_y);
 
     position = mix(next_particle.position, particle.position, 0.5);
