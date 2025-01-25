@@ -177,7 +177,6 @@ fn vertex(
     let normal = particle.f32x3_0;
 
     axis_x = normalize(delta);
-    //axis_y = normalize(cross(axis_x, axis_z));
     axis_y = cross(normal, axis_x);
     axis_z = cross(axis_x, axis_y);
 
