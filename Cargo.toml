@@ -79,7 +79,9 @@ naga = { version = "23", features = ["wgsl-in"] }
 naga_oil = { version = "0.16", default-features = false, features = ["test_shader"] }
 
 [dependencies.bevy]
-version = "0.15"
+# version = "0.15"
+git = "https://github.com/NathanTaylorHunt/bevy"
+branch = "main"
 default-features = false
 features = [
   "bevy_core_pipeline",
