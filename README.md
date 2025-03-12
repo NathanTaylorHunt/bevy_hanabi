@@ -113,15 +113,13 @@ fn setup(mut effects: ResMut<Assets<EffectAsset>>) {
 
 ### Spawn a particle effect
 
-Use a `ParticleEffect` to create an effect instance from an existing asset. The simplest way is to use the `ParticleEffectBundle` to ensure all required components are spawned together.
+Use a `ParticleEffect` to create an effect instance from an existing asset.
 
 ```rust
-commands
-    .spawn(ParticleEffectBundle {
-        effect: ParticleEffect::new(effect_handle),
-        transform: Transform::from_translation(Vec3::Y),
-        ..Default::default()
-    });
+commands.spawn((
+    ParticleEffect::new(effect_handle),
+    Transform::from_translation(Vec3::Y),
+));
 ```
 
 ## Examples
@@ -184,7 +182,7 @@ This list contains the major fixed features provided by 🎆 Hanabi. Beyond that
 - Render
   - [x] Quad
     - [x] Textured
-  - [ ] Generic 3D mesh
+  - [x] Generic 3D mesh
   - [x] Deformation
     - [x] Stretch alongside velocity
     - [x] Trails / Ribbons

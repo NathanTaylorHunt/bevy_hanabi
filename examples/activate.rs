@@ -130,8 +130,7 @@ fn setup(
     );
 
     ball.with_children(|node| {
-        node.spawn(ParticleEffectBundle::new(effect))
-            .insert(Name::new("effect"));
+        node.spawn((ParticleEffect::new(effect), Name::new("effect")));
     });
 
     commands.spawn((
@@ -153,7 +152,7 @@ fn setup(
 
 fn update(
     mut q_balls: Query<(&mut Ball, &mut Transform, &Children)>,
-    mut q_spawner: Query<&mut EffectInitializers>,
+    mut q_spawner: Query<&mut EffectSpawner>,
     mut q_text: Query<&mut Text, With<StatusText>>,
     time: Res<Time>,
 ) {
@@ -171,8 +170,8 @@ fn update(
         // CoreSet::PostUpdate, so will not be available yet. Ignore for a frame
         // if so.
         let is_active = transform.translation.y < 0.0;
-        if let Ok(mut spawner) = q_spawner.get_mut(children[0]) {
-            spawner.set_active(is_active);
+        if let Ok(mut effect_spawner) = q_spawner.get_mut(children[0]) {
+            effect_spawner.set_active(is_active);
         }
 
         let mut text = q_text.single_mut();
