@@ -16,6 +16,8 @@ use rand::Rng;
 mod utils;
 use utils::*;
 
+const DEMO_DESC: &str = include_str!("instancing.txt");
+
 #[derive(Default, Resource)]
 struct InstanceManager {
     effect: Handle<EffectAsset>,
@@ -71,11 +73,7 @@ impl InstanceManager {
             return;
         }
 
-        let pos = origin
-            + IVec2::new(
-                index as i32 % self.grid_size.x,
-                index as i32 / self.grid_size.x,
-            );
+        let pos = origin + IVec2::new(index % self.grid_size.x, index / self.grid_size.x);
 
         *entry = Some(
             commands
@@ -140,8 +138,8 @@ impl InstanceManager {
             .nth(n)
             .unwrap();
         let entity = entry.take().unwrap();
-        if let Some(entity_commands) = commands.get_entity(entity) {
-            entity_commands.despawn_recursive();
+        if let Ok(mut entity_commands) = commands.get_entity(entity) {
+            entity_commands.despawn();
         }
         self.count -= 1;
     }
@@ -166,8 +164,8 @@ impl InstanceManager {
     pub fn despawn_all(&mut self, commands: &mut Commands) {
         for entity in &mut self.instances {
             if let Some(entity) = entity.take() {
-                if let Some(entity_commands) = commands.get_entity(entity) {
-                    entity_commands.despawn_recursive();
+                if let Ok(mut entity_commands) = commands.get_entity(entity) {
+                    entity_commands.despawn();
                 }
             }
         }
@@ -176,7 +174,10 @@ impl InstanceManager {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let app_exit = utils::make_test_app("instancing")
+    let app_exit = utils::DemoApp::new("instancing")
+        .with_desc(DEMO_DESC)
+        .with_desc_position(DescPosition::BottomRow)
+        .build()
         .insert_resource(InstanceManager::new(5, 4))
         .add_systems(Startup, setup)
         .add_systems(Update, keyboard_input_system)
@@ -238,13 +239,13 @@ fn setup(
     };
 
     let effect = effects.add(
-        EffectAsset::new(512, Spawner::rate(50.0.into()), writer.finish())
+        EffectAsset::new(512, SpawnerSettings::rate(50.0.into()), writer.finish())
             .with_name("instancing")
             .init(init_pos)
             .init(init_vel)
             .init(init_age)
             .init(init_lifetime)
-            .render(ColorOverLifetimeModifier { gradient }),
+            .render(ColorOverLifetimeModifier::new(gradient)),
     );
 
     let mut gradient = Gradient::new();
@@ -278,7 +279,7 @@ fn setup(
     module.add_texture_slot("color");
 
     let alt_effect = effects.add(
-        EffectAsset::new(512, Spawner::rate(102.0.into()), module)
+        EffectAsset::new(512, SpawnerSettings::rate(102.0.into()), module)
             .with_simulation_space(SimulationSpace::Local)
             .with_name("alternate instancing")
             .init(init_pos)
@@ -289,7 +290,7 @@ fn setup(
                 texture_slot,
                 sample_mapping: ImageSampleMapping::Modulate,
             })
-            .render(ColorOverLifetimeModifier { gradient }),
+            .render(ColorOverLifetimeModifier::new(gradient)),
     );
 
     // Store the effects for later reference

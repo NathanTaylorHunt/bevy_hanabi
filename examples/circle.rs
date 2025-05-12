@@ -14,8 +14,12 @@ mod utils;
 use texutils::make_anim_img;
 use utils::*;
 
+const DEMO_DESC: &str = include_str!("circle.txt");
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let app_exit = utils::make_test_app("circle")
+    let app_exit = utils::DemoApp::new("circle")
+        .with_desc(DEMO_DESC)
+        .build()
         .add_systems(Startup, setup)
         .run();
     app_exit.into_result()
@@ -116,27 +120,31 @@ fn setup(
     module.add_texture_slot("shape");
 
     let effect = effects.add(
-        EffectAsset::new(32768, Spawner::burst(32.0.into(), 8.0.into()), module)
-            .with_name("circle")
-            .init(init_pos)
-            .init(init_vel)
-            .init(init_age)
-            .init(init_lifetime)
-            .update(update_sprite_index)
-            .render(ParticleTextureModifier {
-                texture_slot: texture_slot,
-                sample_mapping: ImageSampleMapping::ModulateOpacityFromR,
-            })
-            .render(ParticleTextureModifier {
-                texture_slot: texture_slot2,
-                sample_mapping: ImageSampleMapping::ModulateRGB,
-            })
-            .render(FlipbookModifier { sprite_grid_size })
-            .render(ColorOverLifetimeModifier { gradient })
-            .render(SizeOverLifetimeModifier {
-                gradient: Gradient::constant([0.5; 3].into()),
-                screen_space_size: false,
-            }),
+        EffectAsset::new(
+            32768,
+            SpawnerSettings::burst(32.0.into(), 8.0.into()),
+            module,
+        )
+        .with_name("circle")
+        .init(init_pos)
+        .init(init_vel)
+        .init(init_age)
+        .init(init_lifetime)
+        .update(update_sprite_index)
+        .render(ParticleTextureModifier {
+            texture_slot,
+            sample_mapping: ImageSampleMapping::ModulateOpacityFromR,
+        })
+        .render(ParticleTextureModifier {
+            texture_slot: texture_slot2,
+            sample_mapping: ImageSampleMapping::ModulateRGB,
+        })
+        .render(FlipbookModifier { sprite_grid_size })
+        .render(ColorOverLifetimeModifier::new(gradient))
+        .render(SizeOverLifetimeModifier {
+            gradient: Gradient::constant([0.5; 3].into()),
+            screen_space_size: false,
+        }),
     );
 
     // The ground

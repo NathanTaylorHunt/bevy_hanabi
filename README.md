@@ -9,7 +9,7 @@
 
 🎆 Hanabi — a GPU particle system for the Bevy game engine.
 
-![firework](examples/firework.gif)
+![firework](https://raw.githubusercontent.com/djeedai/bevy_hanabi/d65cd725f25b20122c926b585d374ad91a404319/examples/firework.gif)
 
 ## Overview
 
@@ -17,7 +17,7 @@ The Hanabi particle system is a modern GPU-based particle system for the Bevy ga
 
 🚧 _This project is under heavy development, and is currently lacking both features and performance / usability polish. However, for moderate-size effects, it can already be used in your project. Feedback and contributions on both design and features are very much welcome._
 
-🎆 Hanabi makes heavy use of compute shaders to offload work to the GPU in a performant way. Support for compute shaders on the `wasm` target (WebAssembly) is available as of v0.13 (Bevy 0.14), and only through WebGPU. See the [WebAssembly support](./docs/wasm.md) documentation for details.
+🎆 Hanabi makes heavy use of compute shaders to offload work to the GPU in a performant way. Support for compute shaders on the `wasm` target (WebAssembly) is available as of v0.13 (Bevy 0.14), and only through WebGPU. See the [WebAssembly support](https://github.com/djeedai/bevy_hanabi/blob/d65cd725f25b20122c926b585d374ad91a404319/docs/wasm.md) documentation for details.
 
 ## Usage
 
@@ -29,7 +29,7 @@ Add the `bevy_hanabi` dependency to `Cargo.toml`:
 
 ```toml
 [dependencies]
-bevy_hanabi = "0.14"
+bevy_hanabi = "0.15"
 ```
 
 See also [Features](#features) below for the list of supported features.
@@ -92,7 +92,7 @@ fn setup(mut effects: ResMut<Assets<EffectAsset>>) {
     // Maximum number of particles alive at a time
     32768,
     // Spawn at a rate of 5 particles per second
-    Spawner::rate(5.0.into()),
+    SpawnerSettings::rate(5.0.into()),
     // Move the expression module into the asset
     module
   )
@@ -124,15 +124,15 @@ commands.spawn((
 
 ## Examples
 
-See the [`examples/`](https://github.com/djeedai/bevy_hanabi/tree/168cdf9f301100727eebeefe0e9580b0c8426416/examples) folder.
+See the [`examples/`](https://github.com/djeedai/bevy_hanabi/tree/d65cd725f25b20122c926b585d374ad91a404319/examples) folder.
 
-A web demo (using the WebAssembly target) showing all examples is availabe in the [`examples/wasm/`](./examples/wasm/) folder. You can open `index.html` in any browser to see a GIF of all the examples. Running the actual WebAssembly example however requires serving the files with an HTTP server. If you have NodeJS installed, you can do that for example by running `npx http-server examples/wasm`.
+A web demo (using the WebAssembly target) showing all examples is availabe in the [`examples/wasm/`](https://github.com/djeedai/bevy_hanabi/tree/d65cd725f25b20122c926b585d374ad91a404319/examples/wasm) folder. You can open `index.html` in any browser to see a GIF of all the examples. Running the actual WebAssembly example however requires serving the files with an HTTP server. If you have NodeJS installed, you can do that for example by running `npx http-server examples/wasm`.
 
 Note for Linux users: The examples build with the `bevy/x11` feature by default to enable support for the X11 display server. If you want to use the Wayland display server instead, add the `bevy/wayland` feature.
 
 ## Feature List
 
-This list contains the major fixed features provided by 🎆 Hanabi. Beyond that, with the power of the [Expressions API](https://docs.rs/bevy_hanabi/0.14.0/bevy_hanabi/graph/expr/index.html), visual effect authors can further customize their effects by assigning individual particle attributes (position, color, _etc._).
+This list contains the major fixed features provided by 🎆 Hanabi. Beyond that, with the power of the [Expressions API](https://docs.rs/bevy_hanabi/0.15.1/bevy_hanabi/graph/expr/index.html), visual effect authors can further customize their effects by assigning individual particle attributes (position, color, _etc._).
 
 - Spawn
   - [x] Constant rate
@@ -220,7 +220,7 @@ This list contains the major fixed features provided by 🎆 Hanabi. Beyond that
 For optimization purpose, users of a single type of camera can disable the other type by skipping default features in their `Cargo.toml`. For example to use only the 3D mode:
 
 ```toml
-bevy_hanabi = { version = "0.14", default-features = false, features = [ "3d", "serde" ] }
+bevy_hanabi = { version = "0.15", default-features = false, features = [ "3d", "serde" ] }
 ```
 
 ## Compatible Bevy versions
@@ -231,7 +231,7 @@ Compatibility of `bevy_hanabi` versions:
 
 | `bevy_hanabi` | `bevy` |
 | :--           | :--    |
-| `0.14`        | `0.15` |
+| `0.14`-`0.15` | `0.15` |
 | `0.12`-`0.13` | `0.14` |
 | `0.10`-`0.11` | `0.13` |
 | `0.8`-`0.9`   | `0.12` |

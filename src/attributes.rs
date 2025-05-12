@@ -133,10 +133,10 @@ use bevy::{
     math::{Vec2, Vec3, Vec4},
     reflect::{
         utility::{GenericTypePathCell, NonGenericTypeInfoCell},
-        ApplyError, DynamicStruct, FieldIter, FromReflect, FromType, GetTypeRegistration,
-        NamedField, PartialReflect, Reflect, ReflectDeserialize, ReflectFromReflect, ReflectMut,
-        ReflectOwned, ReflectRef, ReflectSerialize, Struct, StructInfo, TypeInfo, TypePath,
-        TypeRegistration, Typed,
+        ApplyError, FieldIter, FromReflect, FromType, GetTypeRegistration, NamedField,
+        PartialReflect, Reflect, ReflectDeserialize, ReflectFromReflect, ReflectMut, ReflectOwned,
+        ReflectRef, ReflectSerialize, Struct, StructInfo, TypeInfo, TypePath, TypeRegistration,
+        Typed,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -680,6 +680,10 @@ impl AttributeInner {
         &AttributeInner::new(Cow::Borrowed("pad1"), Value::Scalar(ScalarValue::Uint(0)));
     pub(crate) const PAD2: &'static AttributeInner =
         &AttributeInner::new(Cow::Borrowed("pad2"), Value::Scalar(ScalarValue::Uint(0)));
+    pub(crate) const PAD3: &'static AttributeInner =
+        &AttributeInner::new(Cow::Borrowed("pad3"), Value::Scalar(ScalarValue::Uint(0)));
+    pub(crate) const PAD4: &'static AttributeInner =
+        &AttributeInner::new(Cow::Borrowed("pad4"), Value::Scalar(ScalarValue::Uint(0)));
 
     #[inline]
     pub(crate) const fn new(name: Cow<'static, str>, default_value: Value) -> Self {
@@ -797,17 +801,6 @@ impl Struct for Attribute {
 
     fn iter_fields(&self) -> FieldIter {
         FieldIter::new(self)
-    }
-
-    fn clone_dynamic(&self) -> DynamicStruct {
-        let mut dynamic = DynamicStruct::default();
-        dynamic.set_represented_type(self.get_represented_type_info());
-        dynamic.insert_boxed("name", <dyn Reflect>::clone_value(&self.0.name));
-        dynamic.insert_boxed(
-            "default_value",
-            <dyn Reflect>::clone_value(&self.0.default_value),
-        );
-        dynamic
     }
 }
 
@@ -1385,6 +1378,8 @@ impl Attribute {
     pub(crate) const PAD0: Attribute = Attribute(AttributeInner::PAD0);
     pub(crate) const PAD1: Attribute = Attribute(AttributeInner::PAD1);
     pub(crate) const PAD2: Attribute = Attribute(AttributeInner::PAD2);
+    pub(crate) const PAD3: Attribute = Attribute(AttributeInner::PAD3);
+    pub(crate) const PAD4: Attribute = Attribute(AttributeInner::PAD4);
 
     /// Retrieve an attribute by its name.
     ///
@@ -1514,7 +1509,13 @@ impl ParticleLayoutBuilder {
     /// let layout = ParticleLayout::new().append(Attribute::POSITION).build();
     /// ```
     pub fn build(mut self) -> ParticleLayout {
-        let pads = [Attribute::PAD0, Attribute::PAD1, Attribute::PAD2];
+        let pads = [
+            Attribute::PAD0,
+            Attribute::PAD1,
+            Attribute::PAD2,
+            Attribute::PAD3,
+            Attribute::PAD4,
+        ];
         let mut next_pad = 0;
 
         // Remove duplicates
@@ -2236,7 +2237,7 @@ mod tests {
                     );
                 }
 
-                let d = s.clone_dynamic();
+                let d = s.to_dynamic_struct();
                 assert_eq!(
                     TypeRegistration::of::<Attribute>().type_id(),
                     d.get_represented_type_info().unwrap().type_id()

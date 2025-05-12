@@ -18,8 +18,12 @@ use bevy_hanabi::prelude::*;
 mod utils;
 use utils::*;
 
+const DEMO_DESC: &str = include_str!("ordering.txt");
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let app_exit = utils::make_test_app("ordering")
+    let app_exit = utils::DemoApp::new("ordering")
+        .with_desc(DEMO_DESC)
+        .build()
         .add_systems(Startup, setup)
         .run();
     app_exit.into_result()
@@ -72,7 +76,7 @@ fn make_firework() -> EffectAsset {
         speed: (writer.rand(ScalarType::Float) * writer.lit(20.) + writer.lit(60.)).expr(),
     };
 
-    EffectAsset::new(2048, Spawner::rate(128.0.into()), writer.finish())
+    EffectAsset::new(2048, SpawnerSettings::rate(128.0.into()), writer.finish())
         .with_name("firework")
         .init(init_pos)
         .init(init_vel)
@@ -82,9 +86,7 @@ fn make_firework() -> EffectAsset {
         .update(update_accel)
         // Note: we (ab)use the ColorOverLifetimeModifier to set a fixed color hard-coded in the
         // render shader, without having to store a per-particle color. This is an optimization.
-        .render(ColorOverLifetimeModifier {
-            gradient: color_gradient1,
-        })
+        .render(ColorOverLifetimeModifier::new(color_gradient1))
         .render(SizeOverLifetimeModifier {
             gradient: size_gradient1,
             screen_space_size: false,

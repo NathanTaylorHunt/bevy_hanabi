@@ -3,16 +3,17 @@ use bevy::core_pipeline::core_2d::Transparent2d;
 #[cfg(feature = "3d")]
 use bevy::core_pipeline::core_3d::{AlphaMask3d, Opaque3d, Transparent3d};
 use bevy::{
+    asset::weak_handle,
     prelude::*,
     render::{
-        mesh::allocator::allocate_and_free_meshes,
+        extract_component::ExtractComponentPlugin,
         render_asset::prepare_assets,
         render_graph::RenderGraph,
         render_phase::DrawFunctions,
         render_resource::{SpecializedComputePipelines, SpecializedRenderPipelines},
         renderer::{RenderAdapterInfo, RenderDevice},
         texture::GpuImage,
-        view::{check_visibility, prepare_view_uniforms, visibility::VisibilitySystems},
+        view::{prepare_view_uniforms, visibility::VisibilitySystems},
         Render, RenderApp, RenderSet,
     },
     time::{time_system, TimeSystem},
@@ -25,12 +26,13 @@ use crate::{
     compile_effects,
     properties::EffectProperties,
     render::{
-        add_effects, batch_effects, clear_all_effects, extract_effect_events, extract_effects,
-        fixup_parents, on_remove_cached_effect, on_remove_cached_properties, prepare_bind_groups,
-        prepare_effects, prepare_gpu_resources, prepare_property_buffers, queue_effects,
-        resolve_parents, DebugSettings, DispatchIndirectPipeline, DrawEffects, EffectAssetEvents,
-        EffectBindGroups, EffectCache, EffectsMeta, EventCache, ExtractedEffects,
-        GpuBufferOperationQueue, GpuEffectMetadata, GpuSpawnerParams, ParticlesInitPipeline,
+        add_effects, batch_effects, clear_transient_batch_inputs, extract_effect_events,
+        extract_effects, fixup_parents, on_remove_cached_effect, on_remove_cached_properties,
+        prepare_bind_groups, prepare_effects, prepare_gpu_resources, prepare_property_buffers,
+        queue_effects, queue_init_fill_dispatch_ops, resolve_parents, update_mesh_locations,
+        DebugSettings, DispatchIndirectPipeline, DrawEffects, EffectAssetEvents, EffectBindGroups,
+        EffectCache, EffectsMeta, EventCache, ExtractedEffects, GpuBufferOperations,
+        GpuEffectMetadata, GpuSpawnerParams, InitFillDispatchQueue, ParticlesInitPipeline,
         ParticlesRenderPipeline, ParticlesUpdatePipeline, PropertyBindGroups, PropertyCache,
         RenderDebugSettings, ShaderCache, SimParams, SortBindGroups, SortedEffectBatches,
         StorageType as _, UtilsPipeline, VfxSimulateDriverNode, VfxSimulateNode,
@@ -38,8 +40,8 @@ use crate::{
     spawn::{self, Random},
     tick_spawners,
     time::effect_simulation_time_system,
-    update_properties_from_asset, CompiledParticleEffect, EffectSimulation, ParticleEffect,
-    Spawner, ToWgslString,
+    update_properties_from_asset, EffectSimulation, EffectVisibilityClass, ParticleEffect,
+    SpawnerSettings, ToWgslString,
 };
 
 /// Labels for the Hanabi systems.
@@ -120,9 +122,8 @@ pub mod simulate_graph {
     }
 }
 
-// {626E7AD3-4E54-487E-B796-9A90E34CC1EC}
 const HANABI_COMMON_TEMPLATE_HANDLE: Handle<Shader> =
-    Handle::weak_from_u128(0x626E7AD34E54487EB7969A90E34CC1ECu128);
+    weak_handle!("626E7AD3-4E54-487E-B796-9A90E34CC1EC");
 
 /// Plugin to add systems related to Hanabi.
 #[derive(Debug, Clone, Copy)]
@@ -194,15 +195,12 @@ impl HanabiPlugin {
     }
 }
 
-/// A convenient alias for `With<CompiledParticleEffect>`, for use with
-/// [`bevy_render::view::VisibleEntities`].
-pub type WithCompiledParticleEffect = With<CompiledParticleEffect>;
-
 impl Plugin for HanabiPlugin {
     fn build(&self, app: &mut App) {
         // Register asset
         app.init_asset::<EffectAsset>()
             .insert_resource(Random(spawn::new_rng()))
+            .add_plugins(ExtractComponentPlugin::<EffectVisibilityClass>::default())
             .init_resource::<DefaultMesh>()
             .init_resource::<ShaderCache>()
             .init_resource::<DebugSettings>()
@@ -233,8 +231,6 @@ impl Plugin for HanabiPlugin {
                     tick_spawners.in_set(EffectSystems::TickSpawners),
                     compile_effects.in_set(EffectSystems::CompileEffects),
                     update_properties_from_asset.in_set(EffectSystems::UpdatePropertiesFromAsset),
-                    check_visibility::<WithCompiledParticleEffect>
-                        .in_set(VisibilitySystems::CheckVisibility),
                 ),
             );
 
@@ -245,7 +241,7 @@ impl Plugin for HanabiPlugin {
         app.register_type::<EffectAsset>()
             .register_type::<ParticleEffect>()
             .register_type::<EffectProperties>()
-            .register_type::<Spawner>()
+            .register_type::<SpawnerSettings>()
             .register_type::<Time<EffectSimulation>>();
     }
 
@@ -362,9 +358,10 @@ impl Plugin for HanabiPlugin {
             .init_resource::<RenderDebugSettings>()
             .init_resource::<EffectBindGroups>()
             .init_resource::<PropertyBindGroups>()
+            .init_resource::<InitFillDispatchQueue>()
             .insert_resource(sort_bind_groups)
             .init_resource::<UtilsPipeline>()
-            .init_resource::<GpuBufferOperationQueue>()
+            .init_resource::<GpuBufferOperations>()
             .init_resource::<DispatchIndirectPipeline>()
             .init_resource::<SpecializedComputePipelines<DispatchIndirectPipeline>>()
             .init_resource::<ParticlesInitPipeline>()
@@ -395,18 +392,18 @@ impl Plugin for HanabiPlugin {
                 Render,
                 (
                     (
-                        clear_all_effects,
+                        clear_transient_batch_inputs,
                         add_effects,
                         resolve_parents,
                         fixup_parents,
+                        update_mesh_locations
+                            .after(bevy::render::mesh::allocator::allocate_and_free_meshes),
                         prepare_effects,
                         batch_effects,
                     )
                         .chain()
                         .after(prepare_assets::<bevy::render::mesh::RenderMesh>)
-                        .in_set(EffectSystems::PrepareEffectAssets)
-                        // Ensure we run after Bevy prepared the render Mesh
-                        .after(allocate_and_free_meshes),
+                        .in_set(EffectSystems::PrepareEffectAssets),
                     queue_effects
                         .in_set(EffectSystems::QueueEffects)
                         .after(batch_effects),
@@ -417,6 +414,10 @@ impl Plugin for HanabiPlugin {
                     prepare_property_buffers
                         .in_set(EffectSystems::PrepareEffectGpuResources)
                         .after(add_effects)
+                        .before(prepare_bind_groups),
+                    queue_init_fill_dispatch_ops
+                        .in_set(EffectSystems::PrepareEffectGpuResources)
+                        .after(prepare_gpu_resources)
                         .before(prepare_bind_groups),
                     prepare_bind_groups
                         .in_set(EffectSystems::PrepareBindGroups)

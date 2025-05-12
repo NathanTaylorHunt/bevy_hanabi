@@ -2,7 +2,8 @@ use std::num::{NonZeroU32, NonZeroU64};
 
 use bevy::{
     asset::Handle,
-    ecs::{system::Resource, world::World},
+    ecs::{resource::Resource, world::World},
+    platform::collections::{hash_map::Entry, HashMap},
     render::{
         render_resource::{
             BindGroup, BindGroupLayout, Buffer, BufferId, CachedComputePipelineId,
@@ -10,10 +11,7 @@ use bevy::{
         },
         renderer::RenderDevice,
     },
-    utils::{
-        default,
-        hashbrown::{hash_map::Entry, HashMap},
-    },
+    utils::default,
 };
 use wgpu::{
     BindGroupEntry, BindGroupLayoutEntry, BindingResource, BindingType, BufferBinding,
@@ -111,15 +109,11 @@ impl SortBindGroups {
                 | BufferUsages::INDIRECT,
             mapped_at_creation: false,
         });
-        let mut indirect_buffer = GpuBuffer::new_allocated(
+        let indirect_buffer = GpuBuffer::new_allocated(
             indirect_buffer,
             indirect_buffer_size as u32,
             Some("hanabi:buffer:sort:indirect".to_string()),
         );
-
-        // Always allocate entry #0 for the sort pass itself. We don't store the index,
-        // it's always zero.
-        indirect_buffer.allocate();
 
         let sort_bind_group_layout = render_device.create_bind_group_layout(
             "hanabi:bind_group_layout:sort",
@@ -191,12 +185,12 @@ impl SortBindGroups {
                     },
                     count: None,
                 },
-                // @group(0) @binding(2) var<storage, read> effect_metadata : EffectMetadata;
+                // @group(0) @binding(2) var<storage, read_write> effect_metadata : EffectMetadata;
                 BindGroupLayoutEntry {
                     binding: 2,
                     visibility: ShaderStages::COMPUTE,
                     ty: BindingType::Buffer {
-                        ty: BufferBindingType::Storage { read_only: true },
+                        ty: BufferBindingType::Storage { read_only: false },
                         has_dynamic_offset: true,
                         min_binding_size: Some(effect_metadata_min_binding_size),
                     },
@@ -244,13 +238,6 @@ impl SortBindGroups {
     #[inline]
     pub fn get_indirect_dispatch_byte_offset(&self, index: u32) -> u32 {
         self.indirect_buffer.item_size() as u32 * index
-    }
-
-    #[inline]
-    pub fn get_sort_indirect_dispatch_byte_offset(&self) -> u32 {
-        // See new(); we always allocate entry #0 in the indirect buffer for the sort
-        // pass itself
-        0
     }
 
     #[inline]
@@ -339,12 +326,12 @@ impl SortBindGroups {
                             },
                             count: None,
                         },
-                        // @group(0) @binding(3) var<storage, read> effect_metadata : EffectMetadata;
+                        // @group(0) @binding(3) var<storage, read_write> effect_metadata : EffectMetadata;
                         BindGroupLayoutEntry {
                             binding: 3,
                             visibility: ShaderStages::COMPUTE,
                             ty: BindingType::Buffer {
-                                ty: BufferBindingType::Storage { read_only: true },
+                                ty: BufferBindingType::Storage { read_only: false },
                                 has_dynamic_offset: true,
                                 min_binding_size: Some(GpuEffectMetadata::aligned_size(alignment)),
                             },

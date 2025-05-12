@@ -13,11 +13,16 @@ use bevy_hanabi::prelude::*;
 mod utils;
 use utils::*;
 
+const DEMO_DESC: &str = include_str!("init.txt");
+
 #[derive(Component)]
 struct RotateSpeed(pub f32);
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let app_exit = utils::make_test_app("init")
+    let app_exit = utils::DemoApp::new("init")
+        .with_desc(DEMO_DESC)
+        .with_desc_position(DescPosition::BottomRow)
+        .build()
         .add_systems(Startup, setup)
         .add_systems(Update, rotate_effect)
         .run();
@@ -36,14 +41,12 @@ where
 
     let init = make_modifier(&writer);
 
-    EffectAsset::new(32768, Spawner::once(COUNT.into(), true), writer.finish())
+    EffectAsset::new(32768, SpawnerSettings::once(COUNT.into()), writer.finish())
         .with_name(name)
         .with_simulation_space(SimulationSpace::Local)
         .init(init)
         .render(OrientModifier::new(OrientMode::FaceCameraPosition))
-        .render(SetColorModifier {
-            color: COLOR.into(),
-        })
+        .render(SetColorModifier::new(COLOR))
         .render(SetSizeModifier { size: SIZE.into() })
 }
 

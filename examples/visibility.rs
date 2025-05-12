@@ -2,9 +2,9 @@
 //! or not when the entity is invisible.
 //!
 //! This example spawns two effects:
-//! - The top one is only simulated when visible
+//! - The bottom one is only simulated when visible
 //!   ([`SimulationCondition::WhenVisible`]; default behavior).
-//! - The bottom one is always simulated, even when invisible
+//! - The top one is always simulated, even when invisible
 //!   ([`SimulationCondition::Always`]).
 //!
 //! A system updates the visibility of the effects, toggling it ON and OFF. We
@@ -18,8 +18,12 @@ use bevy_hanabi::prelude::*;
 mod utils;
 use utils::*;
 
+const DEMO_DESC: &str = include_str!("visibility.txt");
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let app_exit = utils::make_test_app("visibility")
+    let app_exit = utils::DemoApp::new("visibility")
+        .with_desc(DEMO_DESC)
+        .build()
         .add_systems(Startup, setup)
         .add_systems(Update, update)
         .run();
@@ -80,7 +84,7 @@ fn setup(
 
     let mut asset = EffectAsset::new(
         4096,
-        Spawner::burst(50.0.into(), 15.0.into()),
+        SpawnerSettings::burst(50.0.into(), 15.0.into()),
         writer.finish(),
     )
     .with_simulation_condition(SimulationCondition::WhenVisible)
@@ -89,7 +93,7 @@ fn setup(
     .init(init_age)
     .init(init_lifetime)
     //.update(AccelModifier::constant(Vec3::new(0., 2., 0.)))
-    .render(ColorOverLifetimeModifier { gradient });
+    .render(ColorOverLifetimeModifier::new(gradient));
     let effect1 = effects.add(asset.clone());
 
     // Reference cube to visualize the emit origin

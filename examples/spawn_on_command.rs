@@ -2,8 +2,8 @@
 //!
 //! This example demonstrates the use of effect properties to control some
 //! particle properties like the spawn velocity direction and initial particle
-//! color. Particles are spawned "manually" with [`Spawner::reset()`], providing
-//! total control to the application.
+//! color. Particles are spawned "manually" with [`EffectSpawner::reset()`],
+//! providing total control to the application.
 
 use bevy::{
     core_pipeline::tonemapping::Tonemapping, math::Vec3Swizzles, prelude::*,
@@ -14,8 +14,12 @@ use bevy_hanabi::prelude::*;
 mod utils;
 use utils::*;
 
+const DEMO_DESC: &str = include_str!("spawn_on_command.txt");
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let app_exit = utils::make_test_app("spawn_on_command")
+    let app_exit = utils::DemoApp::new("spawn_on_command")
+        .with_desc(DEMO_DESC)
+        .build()
         .add_systems(Startup, setup)
         .add_systems(Update, update)
         .run();
@@ -75,8 +79,10 @@ fn setup(
         Name::new("ball"),
     ));
 
-    // Set `spawn_immediately` to false to spawn on command with Spawner::reset()
-    let spawner = Spawner::once(100.0.into(), false);
+    let spawner = SpawnerSettings::once(100.0.into())
+        // Disable starting emitting particles when the EffectSpawner is instantiated. We want
+        // complete control, and only emit when reset() is called.
+        .with_emit_on_start(false);
 
     let writer = ExprWriter::new();
 
@@ -159,8 +165,7 @@ fn update(
 
     // Note: On first frame where the effect spawns, EffectSpawner is spawned during
     // PostUpdate, so will not be available yet. Ignore for a frame if so.
-    let Ok((mut properties, mut effect_spawner, mut effect_transform)) = effect.get_single_mut()
-    else {
+    let Ok((mut properties, mut effect_spawner, mut effect_transform)) = effect.single_mut() else {
         return;
     };
 

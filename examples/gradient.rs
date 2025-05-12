@@ -6,8 +6,13 @@ use bevy_hanabi::prelude::*;
 mod utils;
 use utils::*;
 
+const DEMO_DESC: &str = include_str!("gradient.txt");
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let app_exit = utils::make_test_app("gradient")
+    let app_exit = utils::DemoApp::new("gradient")
+        .with_desc(DEMO_DESC)
+        .with_desc_position(DescPosition::BottomRow)
+        .build()
         .add_systems(Startup, setup)
         .add_systems(Update, update)
         .run();
@@ -71,7 +76,7 @@ fn setup(
     module.add_texture_slot("color");
 
     let effect = effects.add(
-        EffectAsset::new(32768, Spawner::rate(1000.0.into()), module)
+        EffectAsset::new(32768, SpawnerSettings::rate(1000.0.into()), module)
             .with_name("gradient")
             .init(init_pos)
             .init(init_vel)
@@ -81,7 +86,7 @@ fn setup(
                 texture_slot,
                 sample_mapping: ImageSampleMapping::ModulateOpacityFromR,
             })
-            .render(ColorOverLifetimeModifier { gradient }),
+            .render(ColorOverLifetimeModifier::new(gradient)),
     );
 
     commands

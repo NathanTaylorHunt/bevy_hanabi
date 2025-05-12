@@ -18,8 +18,12 @@ use bevy_hanabi::prelude::*;
 mod utils;
 use utils::*;
 
+const DEMO_DESC: &str = include_str!("worms.txt");
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let app_exit = utils::make_test_app("worms")
+    let app_exit = utils::DemoApp::new("worms")
+        .with_desc(DEMO_DESC)
+        .build()
         .add_systems(Startup, setup)
         .run();
     app_exit.into_result()
@@ -84,7 +88,7 @@ fn create_head_effect() -> EffectAsset {
     // Spawn a trail of child body particles into the other effect
     let update_spawn_trail = EmitSpawnEventModifier {
         condition: EventEmitCondition::Always,
-        count: 5,
+        count: writer.lit(5u32).expr(),
         // We use channel #0; see EffectParent
         child_index: 0,
     };
@@ -106,7 +110,7 @@ fn create_head_effect() -> EffectAsset {
     module.add_texture_slot("shape");
 
     // Allocate room for 100 "head" particles (100 worms)
-    EffectAsset::new(100, Spawner::rate(2.0.into()), module)
+    EffectAsset::new(100, SpawnerSettings::rate(2.0.into()), module)
         .with_name("worms_heads")
         .init(init_position_modifier)
         .init(init_angle_modifier)
@@ -148,6 +152,12 @@ fn create_body_effect() -> EffectAsset {
     let init_lifetime_modifier =
         SetAttributeModifier::new(Attribute::LIFETIME, writer.lit(1.5).expr());
 
+    // The trail inherits the color of its parent head
+    let init_color_modifier = SetAttributeModifier::new(
+        Attribute::COLOR,
+        writer.parent_attr(Attribute::COLOR).expr(),
+    );
+
     // Render modifiers
 
     // Set the particle size.
@@ -158,7 +168,7 @@ fn create_body_effect() -> EffectAsset {
     let module = writer.finish();
 
     // Allocate room for 500 trail particles
-    EffectAsset::new(5000, Spawner::rate(0.5.into()), module)
+    EffectAsset::new(5000, SpawnerSettings::rate(0.5.into()), module)
         .with_name("worms_bodies")
         // Body particles don't move. No need to integrate anything (particles don't have any
         // VELOCITY attribute anyway, so that would generate a warning).
@@ -167,6 +177,7 @@ fn create_body_effect() -> EffectAsset {
         .init(init_ribbon_id_modifier)
         .init(init_age_modifier)
         .init(init_lifetime_modifier)
+        .init(init_color_modifier)
         .render(set_size_modifier)
 }
 

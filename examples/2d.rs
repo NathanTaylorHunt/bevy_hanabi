@@ -6,8 +6,13 @@ use bevy_hanabi::prelude::*;
 mod utils;
 use utils::*;
 
+const DEMO_DESC: &str = include_str!("2d.txt");
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let app_exit = utils::make_test_app("2d")
+    let app_exit = utils::DemoApp::new("2d")
+        .with_desc(DEMO_DESC)
+        .with_desc_position(DescPosition::BottomRow)
+        .build()
         .add_systems(Startup, setup)
         .add_systems(Update, update_plane)
         .run();
@@ -26,7 +31,7 @@ fn setup(
     proj.scaling_mode = ScalingMode::FixedVertical {
         viewport_height: 1.,
     };
-    commands.spawn((Camera2d::default(), proj));
+    commands.spawn((Camera2d, Projection::Orthographic(proj)));
 
     // Spawn a reference white square in the center of the screen at Z=0
     commands.spawn((
@@ -73,7 +78,7 @@ fn setup(
     // Create a new effect asset spawning 30 particles per second from a circle
     // and slowly fading from blue-ish to transparent over their lifetime.
     // By default the asset spawns the particles at Z=0.
-    let spawner = Spawner::rate(30.0.into());
+    let spawner = SpawnerSettings::rate(30.0.into());
     let effect = effects.add(
         EffectAsset::new(4096, spawner, module)
             .with_name("2d")
@@ -85,7 +90,7 @@ fn setup(
                 gradient: Gradient::constant(Vec3::splat(0.02)),
                 screen_space_size: false,
             })
-            .render(ColorOverLifetimeModifier { gradient })
+            .render(ColorOverLifetimeModifier::new(gradient))
             .render(round),
     );
 
@@ -95,7 +100,8 @@ fn setup(
 }
 
 fn update_plane(time: Res<Time>, mut query: Query<&mut Transform, With<Mesh2d>>) {
-    let mut transform = query.single_mut();
-    // Move the plane back and forth to show particles ordering relative to it
-    transform.translation.z = (time.elapsed_secs() * 2.5).sin() * 0.045;
+    if let Ok(mut transform) = query.single_mut() {
+        // Move the plane back and forth to show particles ordering relative to it
+        transform.translation.z = (time.elapsed_secs() * 2.5).sin() * 0.045;
+    }
 }

@@ -35,8 +35,12 @@ use bevy_hanabi::prelude::*;
 mod utils;
 use utils::*;
 
+const DEMO_DESC: &str = include_str!("billboard.txt");
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let app_exit = utils::make_test_app("billboard")
+    let app_exit = utils::DemoApp::new("billboard")
+        .with_desc(DEMO_DESC)
+        .build()
         .add_systems(Startup, setup)
         .add_systems(Update, rotate_camera)
         .run();
@@ -115,7 +119,7 @@ fn setup(
     module.add_texture_slot("color");
 
     let effect = effects.add(
-        EffectAsset::new(32768, Spawner::rate(64.0.into()), module)
+        EffectAsset::new(32768, SpawnerSettings::rate(64.0.into()), module)
             .with_name("billboard")
             .with_alpha_mode(bevy_hanabi::AlphaMode::Mask(alpha_cutoff))
             .init(init_pos)
@@ -125,7 +129,7 @@ fn setup(
             .init(init_rotation)
             .init(init_color)
             .render(ParticleTextureModifier {
-                texture_slot: texture_slot,
+                texture_slot,
                 sample_mapping: ImageSampleMapping::ModulateOpacityFromR,
             })
             .render(OrientModifier {
@@ -159,10 +163,11 @@ fn setup(
 }
 
 fn rotate_camera(time: Res<Time>, mut query: Query<&mut Transform, With<Camera>>) {
-    let mut transform = query.single_mut();
-    let radius_xz = 18_f32.sqrt();
-    let a = (time.elapsed_secs() * 0.3).sin();
-    let (s, c) = a.sin_cos();
-    *transform =
-        Transform::from_xyz(c * radius_xz, 3.0, s * radius_xz).looking_at(Vec3::ZERO, Vec3::Y)
+    if let Ok(mut transform) = query.single_mut() {
+        let radius_xz = 18_f32.sqrt();
+        let a = (time.elapsed_secs() * 0.3).sin();
+        let (s, c) = a.sin_cos();
+        *transform =
+            Transform::from_xyz(c * radius_xz, 3.0, s * radius_xz).looking_at(Vec3::ZERO, Vec3::Y)
+    }
 }

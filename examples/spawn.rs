@@ -8,6 +8,8 @@ use bevy_hanabi::prelude::*;
 mod utils;
 use utils::*;
 
+const DEMO_DESC: &str = include_str!("spawn.txt");
+
 /// Set this to `true` to enable WGPU downlevel constraints. This is disabled by
 /// default to prevent the example from failing to start on devices with a
 /// monitor resolution larger than the maximum resolution imposed by the
@@ -26,7 +28,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         wgpu_settings.constrained_limits = Some(limits);
     }
 
-    let app_exit = utils::make_test_app_with_settings("spawn", wgpu_settings)
+    let app_exit = utils::DemoApp::new("spawn")
+        .with_desc(DEMO_DESC)
+        .with_desc_position(DescPosition::BottomRow)
+        .with_wgpu_settings(wgpu_settings)
+        .build()
         .add_systems(Startup, setup)
         .add_systems(Update, update_accel)
         .run();
@@ -101,7 +107,7 @@ fn setup(
     };
 
     let effect1 = effects.add(
-        EffectAsset::new(32768, Spawner::rate(500.0.into()), writer1.finish())
+        EffectAsset::new(32768, SpawnerSettings::rate(500.0.into()), writer1.finish())
             .with_name("emit:rate")
             .init(init_pos1)
             // Make spawned particles move away from the emitter origin
@@ -109,9 +115,7 @@ fn setup(
             .init(init_age1)
             .init(init_lifetime1)
             .update(update_accel1)
-            .render(ColorOverLifetimeModifier {
-                gradient: color_gradient1,
-            })
+            .render(ColorOverLifetimeModifier::new(color_gradient1))
             .render(SizeOverLifetimeModifier {
                 gradient: size_gradient1,
                 screen_space_size: false,
@@ -153,15 +157,17 @@ fn setup(
         speed: writer2.lit(2.).expr(),
     };
     let effect2 = effects.add(
-        EffectAsset::new(32768, Spawner::once(1000.0.into(), true), writer2.finish())
-            .with_name("emit:once")
-            .init(init_pos2)
-            .init(init_vel2)
-            .init(init_age2)
-            .init(init_lifetime2)
-            .render(ColorOverLifetimeModifier {
-                gradient: gradient2,
-            }),
+        EffectAsset::new(
+            32768,
+            SpawnerSettings::once(1000.0.into()),
+            writer2.finish(),
+        )
+        .with_name("emit:once")
+        .init(init_pos2)
+        .init(init_vel2)
+        .init(init_age2)
+        .init(init_lifetime2)
+        .render(ColorOverLifetimeModifier::new(gradient2)),
     );
 
     commands
@@ -217,7 +223,7 @@ fn setup(
     let effect3 = effects.add(
         EffectAsset::new(
             32768,
-            Spawner::burst(400.0.into(), 3.0.into()),
+            SpawnerSettings::burst(400.0.into(), 3.0.into()),
             writer3.finish(),
         )
         .with_name("emit:burst")
@@ -227,9 +233,7 @@ fn setup(
         .init(init_lifetime3)
         .init(init_size3)
         .update(update_accel3)
-        .render(ColorOverLifetimeModifier {
-            gradient: gradient3,
-        }),
+        .render(ColorOverLifetimeModifier::new(gradient3)),
     );
 
     commands
@@ -254,9 +258,10 @@ fn update_accel(
     time: Res<Time>,
     mut query: Query<&mut EffectProperties, With<DynamicRuntimeAccel>>,
 ) {
-    let mut properties = query.single_mut();
-    let accel0 = 10.;
-    let (s, c) = (time.elapsed_secs() * 0.3).sin_cos();
-    let accel = Vec3::new(c * accel0, s * accel0, 0.);
-    properties.set("my_accel", accel.into());
+    if let Ok(mut properties) = query.single_mut() {
+        let accel0 = 10.;
+        let (s, c) = (time.elapsed_secs() * 0.3).sin_cos();
+        let accel = Vec3::new(c * accel0, s * accel0, 0.);
+        properties.set("my_accel", accel.into());
+    }
 }

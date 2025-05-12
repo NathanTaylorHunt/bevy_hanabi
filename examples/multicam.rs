@@ -12,8 +12,13 @@ use bevy_hanabi::prelude::*;
 mod utils;
 use utils::*;
 
+const DEMO_DESC: &str = include_str!("multicam.txt");
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let app_exit = utils::make_test_app("multicam")
+    let app_exit = utils::DemoApp::new("multicam")
+        .with_desc(DEMO_DESC)
+        .with_desc_position(DescPosition::BottomRow)
+        .build()
         .add_systems(Startup, setup)
         .add_systems(Update, update_camera_viewports)
         .run();
@@ -68,16 +73,14 @@ fn make_effect(color: Color) -> EffectAsset {
         speed: writer.lit(6.).expr(),
     };
 
-    EffectAsset::new(32768, Spawner::rate(5.0.into()), writer.finish())
+    EffectAsset::new(32768, SpawnerSettings::rate(5.0.into()), writer.finish())
         .with_name("effect")
         .init(init_pos)
         .init(init_vel)
         .init(init_age)
         .init(init_lifetime)
         .update(update_accel)
-        .render(ColorOverLifetimeModifier {
-            gradient: color_gradient,
-        })
+        .render(ColorOverLifetimeModifier::new(color_gradient))
         .render(SizeOverLifetimeModifier {
             gradient: size_gradient.clone(),
             screen_space_size: false,

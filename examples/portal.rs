@@ -20,8 +20,12 @@ use bevy_hanabi::prelude::*;
 mod utils;
 use utils::*;
 
+const DEMO_DESC: &str = include_str!("portal.txt");
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let app_exit = utils::make_test_app("portal")
+    let app_exit = utils::DemoApp::new("portal")
+        .with_desc(DEMO_DESC)
+        .build()
         .add_systems(Startup, setup)
         .run();
     app_exit.into_result()
@@ -75,16 +79,14 @@ fn setup(mut commands: Commands, mut effects: ResMut<Assets<EffectAsset>>) {
     let tangent_accel = TangentAccelModifier::constant(&mut module, Vec3::ZERO, Vec3::Z, 30.);
 
     let effect1 = effects.add(
-        EffectAsset::new(16384, Spawner::rate(5000.0.into()), module)
+        EffectAsset::new(16384, SpawnerSettings::rate(5000.0.into()), module)
             .with_name("portal")
             .init(init_pos)
             .init(init_age)
             .init(init_lifetime)
             .update(update_drag)
             .update(tangent_accel)
-            .render(ColorOverLifetimeModifier {
-                gradient: color_gradient1,
-            })
+            .render(ColorOverLifetimeModifier::new(color_gradient1))
             .render(SizeOverLifetimeModifier {
                 gradient: size_gradient1,
                 screen_space_size: false,

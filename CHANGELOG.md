@@ -3,7 +3,18 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.15.1] 2025-04-23
+
+### Fixed
+
+- Fixed several bugs related to buffer reallocation and bind group invalidation.
+  Those bugs generally occur when new effects are spawned, triggering GPU buffer reallocations.
+  Using stale bind groups referencing the old buffer produces issues ranging from rendering artifacts,
+  to complete loss of all rendering, or even panics in `wgpu` (where validation catches the misuse).
+  (#446, #450)
+- Added more padding attributes to ensure the particle layout generated is always valid.
+
+## [0.15.0] 2025-04-01
 
 ### Added
 
@@ -38,6 +49,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `EffectAsset::prng_seed` used as the PRNG seed for random expressions on GPU.
   Previously the PRNG seed was implicitly set to a random value.
   To restore the former behavior, just set `prng_seed = rand::random::<u32>()`.
+- Added some new expressions: `acos`, `asin`, `atan`, `atan2`, `round`.
+- Added `SpawnerSettings::cycle_count`, which allows repeating a spawn pattern exactly N times (or forever if N=0).
+- Added several utility functions on `EffectSpawner` to determine its current state.
+- Added `SpawnerSettings::with_emit_on_start()` to enable or disable starting the particle emitting
+  when the `EffectSpawner` component is spawned into the ECS world.
+  This allows spawning the component but only emitting particles under control of the application.
+- Added `ColorBlendMode` and `ColorBlendMask` to customize how color-related modifiers blend their value.
+  This allows overlaying _e.g._ a `SetAttributeModifier(Attribute::COLOR)` and a `ColorOverLifetimeModifier`
+  without the latter overwriting the value of the former.
+  See the `firework.rs` example for an example of using color blending.
+- Added `WriterExpr::vec4_xyz_w()` to recombine a 3D vector and a scalar together into a 4D vector.
+  This is particularly useful to combine some RGB value and Alpha value together.
+- Added new `SetColorModifier::new(Into<CpuValue<Vec4>>)` and `ColorOverLifetimeModifier::new(Gradient<Vec4>)` helpers
+  for the common case where color blend and mask are the defaults.
 
 ### Changed
 
@@ -56,6 +81,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nor any other built-in functionality of Hanabi.
 - `ParticleEffect` now requires (in the ECS sense) the `CompiledParticleEffect`, `Visibility`, and `Transform` components.
   This means those components are automatically added by Bevy each time a `ParticleEffect` is spawned. (#418)
+- Renamed `Spawner` to `SpawnerSettings` to clarify this object doesn't spawn anything in itself.
+- Renamed `EffectSpawner::spawner` into `settings` for consistency.
+- The `EffectSpawner::settings` and `EffectSpawner::active` fields are now public.
 
 ### Fixed
 
@@ -80,6 +108,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Use the `Attribute::RIBBON_ID` instead to assign a per-particle ribbon ID.
 - Removed `ParticleEffectBundle`. Use `ParticleEffect` directly instead.
 - Removed `ParticleEffect::z_layer_2d`. Use the Z coordinate of the effect's `Tranform` to order effects. (#423)
+- Removed `EffectSpawner::spawner()` as the `spawner` field is now public.
+- Removed `Spawner::starts_immediately` which was not working.
+  This is replaced by `SpawnerSettings::with_emit_on_start()`. (#420)
 
 ## [0.14.0] 2024-12-09
 

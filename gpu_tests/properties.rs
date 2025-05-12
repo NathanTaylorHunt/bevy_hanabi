@@ -35,7 +35,7 @@ fn setup(mut commands: Commands, mut assets: ResMut<Assets<EffectAsset>>) {
     let mut module = Module::default();
     module.add_property("my_property", VectorValue::new_vec3(Vec3::ZERO).into());
     let pos = module.lit(Vec3::ZERO);
-    let mut asset = EffectAsset::new(128, Spawner::rate(1.0.into()), module)
+    let mut asset = EffectAsset::new(128, SpawnerSettings::rate(1.0.into()), module)
         .init(SetAttributeModifier::new(Attribute::POSITION, pos));
     asset.name = "test_asset".to_string();
     let handle = assets.add(asset);
@@ -54,12 +54,12 @@ fn timeout(
     frame.0 += 1;
 
     if frame.0 == 10 {
-        let (_, mut effect) = query.single_mut();
+        let (_, mut effect) = query.single_mut().unwrap();
 
         // New effect without any property
         let mut module = Module::default();
         let pos = module.lit(Vec3::ZERO);
-        let asset = EffectAsset::new(128, Spawner::rate(1.0.into()), module)
+        let asset = EffectAsset::new(128, SpawnerSettings::rate(1.0.into()), module)
             .init(SetAttributeModifier::new(Attribute::POSITION, pos));
         let handle = assets.add(asset);
 
@@ -67,12 +67,12 @@ fn timeout(
     }
 
     if frame.0 == 15 {
-        let (entity, _) = query.single();
-        commands.entity(entity).despawn_recursive();
+        let (entity, _) = query.single().unwrap();
+        commands.entity(entity).despawn();
     }
 
     if frame.0 >= 20 {
         info!("SUCCESS!");
-        ev_app_exit.send(AppExit::Success);
+        ev_app_exit.write(AppExit::Success);
     }
 }

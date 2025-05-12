@@ -50,8 +50,8 @@ use bevy::{
     asset::Handle,
     image::Image,
     math::{UVec2, Vec3, Vec4},
+    platform::collections::HashMap,
     reflect::Reflect,
-    utils::HashMap,
 };
 use bitflags::bitflags;
 use serde::{Deserialize, Serialize};
@@ -74,7 +74,7 @@ pub use velocity::*;
 
 use crate::{
     Attribute, EvalContext, ExprError, ExprHandle, Gradient, Module, ParticleLayout,
-    PropertyLayout, TextureLayout, ToWgslString,
+    PropertyLayout, TextureLayout,
 };
 
 /// The dimension of a shape to consider.
@@ -92,7 +92,7 @@ pub enum ShapeDimension {
 /// Calculate a function ID by hashing the given value representative of the
 /// function.
 pub(crate) fn calc_func_id<T: Hash>(value: &T) -> u64 {
-    let mut hasher = DefaultHasher::default();
+    let mut hasher = DefaultHasher::new();
     value.hash(&mut hasher);
     hasher.finish()
 }
@@ -411,8 +411,8 @@ impl<'a> RenderContext<'a> {
             texture_layout,
             textures: vec![],
             sprite_grid_size: None,
-            gradients: HashMap::new(),
-            size_gradients: HashMap::new(),
+            gradients: HashMap::default(),
+            size_gradients: HashMap::default(),
             needs_uv: false,
             needs_normal: false,
             var_counter: 0,
@@ -623,19 +623,23 @@ pub enum EventEmitCondition {
 /// This update modifier is used to spawn new particles into a child effect
 /// instance based on a condition applied to particles of the current effect
 /// instance. The most common use case is to spawn one or more child particles
-/// when a particle dies; this is achieved with [`EventEmitCondition::OnDie`].
+/// into a child effect when a particle in this effect dies; this is achieved
+/// with [`EventEmitCondition::OnDie`].
 ///
 /// An effect instance with this modifier will emit GPU spawn events. Those
 /// events are read by all child effects (those effects with an [`EffectParent`]
-/// component pointing at the current effect instance).
+/// component pointing at the current effect instance). GPU spawn events are
+/// stored internally in a GPU buffer; they're **unrelated** to Bevy ECS events.
 ///
 /// [`EffectParent`]: crate::EffectParent
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect, Serialize, Deserialize)]
 pub struct EmitSpawnEventModifier {
     /// Emit condition for the GPU spawn events.
     pub condition: EventEmitCondition,
-    /// Number of particles to spawn if the emit condition is met.
-    pub count: u32,
+    /// The number of particles to spawn if the emit condition is met.
+    ///
+    /// Expression type: `Uint`
+    pub count: ExprHandle,
     /// Index of the event channel / child the events are emitted into.
     ///
     /// GPU spawn events emitted by this parent event are associated with a
@@ -648,20 +652,25 @@ pub struct EmitSpawnEventModifier {
 impl EmitSpawnEventModifier {
     fn eval(
         &self,
-        _module: &mut Module,
-        _context: &mut dyn EvalContext,
+        module: &mut Module,
+        context: &mut dyn EvalContext,
     ) -> Result<String, ExprError> {
         // FIXME - mixing (ex-)channel and event buffer index; this should be automated
         let channel_index = self.child_index;
         // TODO - validate GPU spawn events are in use in the eval context...
+
+        let count_val = context.eval(module, self.count)?;
+        let count_var = context.make_local_var();
+        context.push_stmt(&format!("let {} = {};", count_var, count_val));
+
         let cond = match self.condition {
             EventEmitCondition::Always => format!(
                 "if (is_alive) {{ append_spawn_events_{channel_index}(particle_index, {}); }}",
-                self.count.to_wgsl_string()
+                count_var
             ),
             EventEmitCondition::OnDie => format!(
                 "if (was_alive && !is_alive) {{ append_spawn_events_{channel_index}(particle_index, {}); }}",
-                self.count.to_wgsl_string()
+                count_var
             ),
         };
         Ok(cond)

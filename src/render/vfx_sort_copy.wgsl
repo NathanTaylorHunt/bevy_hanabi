@@ -12,7 +12,7 @@ struct KeyValuePair {
 }
 
 struct SortBuffer {
-    count: atomic<i32>,
+    count: i32,
     pairs: array<KeyValuePair>,
 }
 
@@ -22,9 +22,10 @@ struct IndirectIndexBuffer {
 
 @group(0) @binding(0) var<storage, read_write> indirect_index_buffer : IndirectIndexBuffer;
 @group(0) @binding(1) var<storage, read> sort_buffer : SortBuffer;
-@group(0) @binding(2) var<storage, read> effect_metadata : EffectMetadata;
+// Technically read-only, but the type contains atomic<> fields and wasm is strict about it
+@group(0) @binding(2) var<storage, read_write> effect_metadata : EffectMetadata;
 
-/// Fill the sorting key-value pair buffer with data to prepare for actual sorting.
+/// Copy the sorted particle indices back into the effect index buffer.
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) global_invocation_id: vec3<u32>) {
     let row_index = global_invocation_id.x;

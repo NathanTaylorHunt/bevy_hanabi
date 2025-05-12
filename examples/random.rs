@@ -7,8 +7,12 @@ use bevy_hanabi::prelude::*;
 mod utils;
 use utils::*;
 
+const DEMO_DESC: &str = include_str!("random.txt");
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let app_exit = utils::make_test_app("random")
+    let app_exit = utils::DemoApp::new("random")
+        .with_desc(DEMO_DESC)
+        .build()
         .add_systems(Startup, setup)
         .run();
     app_exit.into_result()
@@ -68,7 +72,7 @@ fn setup(
     let effect = effects.add(
         EffectAsset::new(
             32768,
-            Spawner::burst(CpuValue::Uniform((1., 100.)), CpuValue::Uniform((1., 4.))),
+            SpawnerSettings::burst(CpuValue::Uniform((1., 100.)), CpuValue::Uniform((1., 4.))),
             writer.finish(),
         )
         .with_name("emit:burst")
@@ -77,7 +81,7 @@ fn setup(
         .init(init_age)
         .init(init_lifetime)
         .update(update_accel)
-        .render(ColorOverLifetimeModifier { gradient }),
+        .render(ColorOverLifetimeModifier::new(gradient)),
     );
 
     commands

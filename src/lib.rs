@@ -35,11 +35,12 @@
 //! 2D pipeline integration is controlled by the `2d` cargo feature, while the
 //! 3D pipeline integration is controlled by the `3d` cargo feature. Both
 //! features are enabled by default for convenience. As an optimization, users
-//! can disable default features and re-enable only one of the two modes.
+//! can disable default features and re-enable only one of the two modes. At
+//! least one of the `2d` or `3d` features must be enabled.
 //!
 //! ```toml
 //! # Example: enable only 3D integration
-//! bevy_hanabi = { version = "0.14", default-features = false, features = ["3d"] }
+//! bevy_hanabi = { version = "0.15", default-features = false, features = ["3d"] }
 //! ```
 //!
 //! # Example
@@ -101,7 +102,7 @@
 //!         // Maximum number of particles alive at a time
 //!         32768,
 //!         // Spawn at a rate of 5 particles per second
-//!         Spawner::rate(5.0.into()),
+//!         SpawnerSettings::rate(5.0.into()),
 //!         // Move the expression module into the asset
 //!         module,
 //!     )
@@ -113,7 +114,11 @@
 //!     // Render the particles with a color gradient over their
 //!     // lifetime. This maps the gradient key 0 to the particle spawn
 //!     // time, and the gradient key 1 to the particle death (10s).
-//!     .render(ColorOverLifetimeModifier { gradient });
+//!     .render(ColorOverLifetimeModifier {
+//!         gradient,
+//!         blend: ColorBlendMode::Overwrite,
+//!         mask: ColorBlendMask::RGBA,
+//!     });
 //!
 //!     // Insert into the asset system
 //!     let effect_asset = effects.add(effect);
@@ -157,20 +162,33 @@
 //!    the effect is active. This allows some moderate CPU-side control over the
 //!    simulation and rendering of the effect, without having to destroy the
 //!    effect and re-create a new one.
+//! 4. If using textures, spawn an [`EffectMaterial`] component to define which
+//!    texture is bound to which slot in the effect. An [`EffectAsset`] only
+//!    defines "slots" of textures, not the actual assets bound to those slots.
+//!    This way, you can reuse the same effect asset multiple times with
+//!    different textures, like you'd do with a regular rendering mesh.
+//! 5. For advanced VFX composed of multiple hierarchical effects, where two or
+//!    more effects are connected to each other in a parent-child relationship,
+//!    spawn an [`EffectParent`] on any child effect instance to specify its
+//!    parent instance. See also the [`EmitSpawnEventModifier`].
 //!
 //! The [`EffectAsset`] is intended to be the serialized effect format, which
 //! authors can save to disk and ship with their application. At this time
 //! however serialization and deserialization is still a work in progress. In
 //! particular, serialization and deserialization of all
-//! [modifiers](crate::modifier) is currently not supported on Wasm.
+//! [modifiers](crate::modifier) is currently not supported on `wasm` target.
 
 use std::fmt::Write as _;
 
 use bevy::{
+    asset::AsAssetId,
+    platform::collections::{HashMap, HashSet},
     prelude::*,
-    render::sync_world::SyncToRenderWorld,
-    utils::{HashMap, HashSet},
+    render::{
+        extract_component::ExtractComponent, sync_world::SyncToRenderWorld, view::VisibilityClass,
+    },
 };
+use rand::{Rng, SeedableRng as _};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -188,7 +206,9 @@ mod time;
 #[cfg(test)]
 mod test_utils;
 
-pub use asset::{AlphaMode, EffectAsset, EffectParent, MotionIntegration, SimulationCondition};
+pub use asset::{
+    AlphaMode, DefaultMesh, EffectAsset, EffectParent, MotionIntegration, SimulationCondition,
+};
 pub use attributes::*;
 pub use gradient::{Gradient, GradientKey};
 pub use graph::*;
@@ -196,7 +216,7 @@ pub use modifier::*;
 pub use plugin::{EffectSystems, HanabiPlugin};
 pub use properties::*;
 pub use render::{DebugSettings, LayoutFlags, ShaderCache};
-pub use spawn::{tick_spawners, CpuValue, EffectSpawner, Random, Spawner};
+pub use spawn::{tick_spawners, CpuValue, EffectSpawner, Random, SpawnerSettings};
 pub use time::{EffectSimulation, EffectSimulationTime};
 
 #[allow(missing_docs)]
@@ -557,6 +577,10 @@ impl From<&PropertyInstance> for PropertyValue {
     }
 }
 
+/// The [`VisibilityClass`] used for all particle effects.
+#[derive(Default, Clone, Copy, Component, ExtractComponent)]
+pub struct EffectVisibilityClass;
+
 /// Particle-based visual effect instance.
 ///
 /// The particle effect component represents a single instance of a visual
@@ -619,34 +643,50 @@ impl From<&PropertyInstance> for PropertyValue {
 /// for example.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component)]
-#[require(CompiledParticleEffect, Transform, Visibility, SyncToRenderWorld)]
+#[require(
+    CompiledParticleEffect,
+    Transform,
+    Visibility,
+    VisibilityClass,
+    SyncToRenderWorld
+)]
+#[component(on_add = bevy::render::view::add_visibility_class::<EffectVisibilityClass>)]
 pub struct ParticleEffect {
     /// Handle of the effect to instantiate.
     pub handle: Handle<EffectAsset>,
 }
 
 impl ParticleEffect {
-    /// Create a new particle effect without a spawner or any modifier.
+    /// Create a new particle effect instance from an existing asset.
     pub fn new(handle: Handle<EffectAsset>) -> Self {
         Self { handle }
+    }
+}
+
+impl AsAssetId for ParticleEffect {
+    type Asset = EffectAsset;
+
+    fn as_asset_id(&self) -> AssetId<Self::Asset> {
+        self.handle.id()
     }
 }
 
 /// Material for an effect instance.
 ///
 /// A material component contains the render resources (textures) for a single
-/// effect instance, which actually bound to the slots defined with
-/// [`Module::add_texture_slot()`]. That way, a same effect asset can be
-/// instantiated multiple times and rendered with different sets of textures,
-/// without changing the asset.
+/// effect instance. Those textures are automatically bound during rendering to
+/// the slots defined with [`Module::add_texture_slot()`]. Using this, multiple
+/// effect instances sharing a same source [`EffectAsset`] can be instantiated
+/// and rendered with different sets of textures, without changing the asset.
 ///
 /// The [`EffectMaterial`] component needs to be spawned on the same entity as
-/// the [`ParticleEffect`].
+/// the [`ParticleEffect`] component representing the effect instance.
 #[derive(Debug, Default, Clone, Component)]
 pub struct EffectMaterial {
-    /// List of textures to use to render the effect instance.
+    /// List of texture images to use to render the effect instance.
     ///
-    /// The images are ordered by [slot index].
+    /// The images are ordered by [slot index] into the corresponding
+    /// [`TextureLayout`].
     ///
     /// [slot index]: crate::TextureLayout::get_slot_by_name
     pub images: Vec<Handle<Image>>,
@@ -688,7 +728,7 @@ impl TextureLayout {
     }
 }
 
-/// Effect shader.
+/// Effect shaders.
 ///
 /// Contains the configured shaders for the init, update, and render passes.
 #[derive(Debug, Default, Clone)]
@@ -701,9 +741,9 @@ pub(crate) struct EffectShader {
 /// Source code (WGSL) of an effect.
 ///
 /// The source code is generated from an [`EffectAsset`] by applying all
-/// modifiers. The resulting source code is configured (the Hanabi variables
-/// `{{VARIABLE}}` are replaced by the relevant WGSL code) but is not
-/// specialized (the conditional directives like `#if` are still present).
+/// modifiers. The resulting source code is _configured_ (the Hanabi variables
+/// `{{VARIABLE}}` are replaced with the relevant WGSL code) but is not
+/// _specialized_ (the conditional directives like `#if` are still present).
 #[derive(Debug)]
 struct EffectShaderSource {
     pub init_shader_source: String,
@@ -902,6 +942,11 @@ impl EffectShaderSource {
             emit_event_buffer_append_funcs_code.push_str(&format!(
                 r##"/// Append one or more spawn events to the event buffer.
 fn append_spawn_events_{0}(particle_index: u32, count: u32) {{
+    // Optimize this case.
+    if (count == 0u) {{
+        return;
+    }}
+
     let base_child_index = effect_metadata.base_child_index;
     let capacity = arrayLength(&event_buffer_{0}.spawn_events);
     let base = min(u32(atomicAdd(&child_info_buffer.rows[base_child_index + {0}].event_count, i32(count))), capacity);
@@ -1613,7 +1658,7 @@ fn compile_effects(
 
     // Count children
     let mut children: HashMap<Entity, Vec<Entity>> =
-        HashMap::with_capacity(particle_layouts_and_parents.len());
+        HashMap::with_capacity_and_hasher(particle_layouts_and_parents.len(), Default::default());
     for (child, (_, parent)) in particle_layouts_and_parents.iter() {
         if let Some(parent) = parent.as_ref() {
             children.entry(*parent).or_default().push(*child);
@@ -1665,25 +1710,31 @@ fn compile_effects(
         let material_changed = material.as_ref().is_some_and(|r| r.is_changed());
         let need_rebuild =
             effect.is_changed() || material_changed || compiled_effect.children != child_entities;
-        if !need_rebuild && (compiled_effect.asset == effect.handle) {
-            continue;
-        }
+        if need_rebuild || (compiled_effect.asset != effect.handle) {
+            if need_rebuild {
+                debug!("Invalidating the compiled cache for effect on entity {:?} due to changes in the ParticleEffect component. If you see this message too much, then performance might be affected. Find why the change detection of the ParticleEffect is triggered.", entity);
+            }
 
-        if need_rebuild {
-            debug!("Invalidating the compiled cache for effect on entity {:?} due to changes in the ParticleEffect component. If you see this message too much, then performance might be affected. Find why the change detection of the ParticleEffect is triggered.", entity);
+            compiled_effect.update(
+                need_rebuild,
+                &effect,
+                material.map(|r| r.into_inner()),
+                asset,
+                parent_entity,
+                child_entities,
+                parent_layout,
+                &mut shaders,
+                &mut shader_cache,
+            );
+        } else {
+            // Update the PRNG seed. Unfortunately at the minute the "seed" (which
+            // really is the internal PRNG state rather) is not cached on GPU, and
+            // is re-uploaded each frame, so if it's not changed every frame then
+            // there's no randomness anymore, because the uses of the previous frame
+            // are "forgotten".
+            let mut rng = rand::rngs::StdRng::seed_from_u64(compiled_effect.prng_seed as u64);
+            compiled_effect.prng_seed = rng.gen();
         }
-
-        compiled_effect.update(
-            need_rebuild,
-            &effect,
-            material.map(|r| r.into_inner()),
-            asset,
-            parent_entity,
-            child_entities,
-            parent_layout,
-            &mut shaders,
-            &mut shader_cache,
-        );
     }
 
     // Clear removed effects, to allow them to be released by the asset server
@@ -1745,7 +1796,7 @@ mod tests {
                 memory::{Dir, MemoryAssetReader},
                 AssetSourceBuilder, AssetSourceBuilders, AssetSourceId,
             },
-            AssetServerMode,
+            AssetServerMode, UnapprovedPathMode,
         },
         render::view::{VisibilityPlugin, VisibilitySystems},
         tasks::{IoTaskPool, TaskPoolBuilder},
@@ -1977,8 +2028,12 @@ else { return c1; }
             .with_reader(move || Box::new(MemoryAssetReader { root: dir.clone() }));
         builders.insert(AssetSourceId::Default, dummy_builder);
         let sources = builders.build_sources(watch_for_changes, false);
-        let asset_server =
-            AssetServer::new(sources, AssetServerMode::Unprocessed, watch_for_changes);
+        let asset_server = AssetServer::new(
+            sources,
+            AssetServerMode::Unprocessed,
+            watch_for_changes,
+            UnapprovedPathMode::Forbid,
+        );
 
         app.insert_resource(asset_server);
         // app.add_plugins(DefaultPlugins);
@@ -1996,7 +2051,7 @@ else { return c1; }
         app
     }
 
-    /// Test case for `tick_initializers()`.
+    /// Test case for `tick_spawners()`.
     struct TestCase {
         /// Initial entity visibility on spawn. If `None`, do not add a
         /// [`Visibility`] component.
@@ -2013,7 +2068,7 @@ else { return c1; }
     fn test_effect_shader_source() {
         // Empty particle layout
         let module = Module::default();
-        let asset = EffectAsset::new(256, Spawner::rate(32.0.into()), module)
+        let asset = EffectAsset::new(256, SpawnerSettings::rate(32.0.into()), module)
             .with_simulation_space(SimulationSpace::Local);
         assert_eq!(asset.simulation_space, SimulationSpace::Local);
         let res = EffectShaderSource::generate(&asset, None, 0);
@@ -2024,7 +2079,7 @@ else { return c1; }
         // Missing Attribute::POSITION, currently mandatory for all effects
         let mut module = Module::default();
         let zero = module.lit(Vec3::ZERO);
-        let asset = EffectAsset::new(256, Spawner::rate(32.0.into()), module)
+        let asset = EffectAsset::new(256, SpawnerSettings::rate(32.0.into()), module)
             .init(SetAttributeModifier::new(Attribute::VELOCITY, zero));
         assert!(asset.particle_layout().size() > 0);
         let res = EffectShaderSource::generate(&asset, None, 0);
@@ -2035,7 +2090,7 @@ else { return c1; }
         // Valid
         let mut module = Module::default();
         let zero = module.lit(Vec3::ZERO);
-        let asset = EffectAsset::new(256, Spawner::rate(32.0.into()), module)
+        let asset = EffectAsset::new(256, SpawnerSettings::rate(32.0.into()), module)
             .with_simulation_space(SimulationSpace::Local)
             .init(SetAttributeModifier::new(Attribute::POSITION, zero));
         assert_eq!(asset.simulation_space, SimulationSpace::Local);
@@ -2171,7 +2226,7 @@ else { return c1; }
     // Regression test for #228
     #[test]
     fn test_compile_effect_changed() {
-        let spawner = Spawner::once(32.0.into(), true);
+        let spawner = SpawnerSettings::once(32.0.into());
 
         let mut app = make_test_app();
 
@@ -2260,7 +2315,7 @@ else { return c1; }
 
     #[test]
     fn test_compile_effect_visibility() {
-        let spawner = Spawner::once(32.0.into(), true);
+        let spawner = SpawnerSettings::once(32.0.into());
 
         for test_case in &[
             TestCase::new(None),
@@ -2318,7 +2373,7 @@ else { return c1; }
 
             let world = app.world_mut();
 
-            // Check the state of the components after `tick_initializers()` ran
+            // Check the state of the components after `tick_spawners()` ran
             if let Some(test_visibility) = test_case.visibility {
                 // Simulated-when-visible effect (SimulationCondition::WhenVisible)
 
